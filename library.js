@@ -10,6 +10,7 @@ const objectsTitle = document.querySelector('#objects-title');
 const comparisonTitle = document.querySelector('#comparison-title');
 const saveButton = document.querySelector('#save-object');
 const saveButtons = [saveButton, document.querySelector('#save-result')];
+const clearFieldsButton = document.querySelector('#clear-fields');
 const leaveButton = document.querySelector('#leave-object');
 const guestButton = document.querySelector('#open-draft');
 const newFromLibrary = document.querySelector('#new-from-library');
@@ -69,10 +70,12 @@ function hasPendingGuestEdits() {
 
 function refreshDraftActions() {
   const draft = currentDraft();
-  for (const button of saveButtons) button.disabled = libraryBusy || !hasDraftValues(draft);
+  const hasValues = hasDraftValues(draft);
+  for (const button of saveButtons) button.disabled = libraryBusy || !hasValues;
+  clearFieldsButton.disabled = libraryBusy || !hasValues;
   let guest = activeObject === null ? draft : guestInMemory?.draft;
   const pendingInEditor = activeObject === null && !sameDraftValues(draft, previousDraft);
-  const readStored = activeObject === null ? !pendingInEditor && !hasDraftValues(draft) : !hasPendingGuestEdits();
+  const readStored = activeObject === null ? !pendingInEditor && !hasValues : !hasPendingGuestEdits();
   if (readStored) {
     try {
       guest = loadDraft(window.localStorage);
@@ -155,6 +158,29 @@ function openGuestEditor() {
   const draft = currentDraft();
   if (activeObject !== null || (!hasDraftValues(draft) && sameDraftValues(draft, previousDraft))) restoreGuestEditor();
   showView('calculator');
+}
+
+function clearEditorFields() {
+  if (libraryBusy || !hasDraftValues(currentDraft())) return;
+  if (!window.confirm('Очистить поля текущего расчёта и его сценария?')) return;
+
+  const editingObject = activeObject !== null;
+  if (!editingObject) {
+    try {
+      if (!clearSavedDraft(window.localStorage, previousDraft)) {
+        showDraftStatus('Черновик изменён в другой вкладке. Откройте актуальную версию.', true);
+        return;
+      }
+    } catch {
+      showDraftStatus('Не удалось очистить черновик в браузере.', true);
+      return;
+    }
+  }
+
+  openEditor(null, editingObject);
+  updateObjectUnloadGuard();
+  showDraftStatus('Поля очищены.');
+  focusEditorControl(document.querySelector('#form-title'));
 }
 
 function newCalculation() {
@@ -385,6 +411,7 @@ function importSelectedFile() {
 }
 
 for (const button of saveButtons) button.addEventListener('click', saveEditorObject);
+clearFieldsButton.addEventListener('click', clearEditorFields);
 leaveButton.addEventListener('click', openGuestEditor);
 guestButton.addEventListener('click', openGuestEditor);
 newFromLibrary.addEventListener('click', newCalculation);

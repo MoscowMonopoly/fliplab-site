@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f6f2">
   <title>FlipLab — калькулятор флип-сделки</title>
-  <link rel="stylesheet" href="styles.css?v=da0d9b87a533">
+  <link rel="stylesheet" href="styles.css?v=1d68029bacfb">
   <script defer src="calculator.js?v=87c867e3674c"></script>
   <script defer src="draft.js?v=9255ac400775"></script>
   <script defer src="objects.js?v=66588a36987f"></script>
   <script defer src="app.js?v=c8b518bb3cbe"></script>
-  <script defer src="library.js?v=14c456671901"></script>
+  <script defer src="library.js?v=f3d8cca67f2d"></script>
   <script defer src="comparison.js?v=afbf43675f4a"></script>
   <script defer src="report.js?v=af74ff9a6700"></script>
   <script defer src="share.js?v=58faa93c4f7c"></script>
@@ -39,7 +39,10 @@
     <noscript><p class="noscript">Включите JavaScript в браузере, чтобы рассчитать сделку.</p></noscript>
 
     <div class="editor-actions">
-      <button type="button" class="primary-button" id="save-object" disabled>Сохранить объект</button>
+      <div class="editor-primary-actions">
+        <button type="button" class="primary-button" id="save-object" disabled>Сохранить объект</button>
+        <button type="button" class="example-button" id="clear-fields" disabled>Очистить поля</button>
+      </div>
       <button type="button" class="example-button" id="leave-object" hidden>Продолжить черновик</button>
     </div>
     <p id="draft-status" class="draft-status" role="status"></p>

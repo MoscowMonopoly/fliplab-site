@@ -149,6 +149,8 @@ h1 {
 }
 
 .editor-actions, .library-actions { margin-bottom: 12px; }
+.editor-primary-actions { display: flex; gap: 8px; min-width: 0; }
+#clear-fields { min-height: 44px; padding-inline: 7px; }
 
 .primary-button {
   min-height: 44px;
