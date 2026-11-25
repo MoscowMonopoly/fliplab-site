@@ -522,6 +522,16 @@ legend {
 }
 .form-card[data-started='false'] .first-step::before { content: none; }
 .object-details { margin-top: 20px; }
+.object-details-hint {
+  display: block;
+  margin-block-start: 4px;
+  margin-inline-start: 1rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.4;
+}
+.object-details[open] .object-details-hint { display: none; }
 
 .scenario-base { display: inline-block; margin-top: 6px; color: var(--muted); font-size: 0.8125rem; }
 .text-button {

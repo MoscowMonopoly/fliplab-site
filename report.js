@@ -15,7 +15,7 @@ const reportFonts = {
 
 const reportMetrics = [
   ['Цена покупки', 'money', (result) => result.costs.purchasePrice],
-  ['Цена сделки', 'money', (result) => result.salePrice],
+  ['Цена продажи', 'money', (result) => result.salePrice],
   ['Бюджет ремонта', 'money', (result) => result.repairCost],
   ['Себестоимость', 'money', (result) => result.totalCost],
   ['Рентабельность', 'percent', (result) => result.returnOnCost],
@@ -103,7 +103,7 @@ function reportComparison(records, format) {
 
   if (results.some(({ scenario }) => scenario)) {
     for (const [label, key, kind] of [
-      ['Изменение цены сделки', 'salePrice', 'money'],
+      ['Изменение цены продажи', 'salePrice', 'money'],
       ['Изменение ремонта', 'repairCost', 'money'],
       ['Изменение срока', 'months', 'months'],
     ]) {

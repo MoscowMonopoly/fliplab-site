@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f6f2">
   <title>FlipLab — калькулятор флип-сделки</title>
-  <link rel="stylesheet" href="styles.css?v=1d23bff37801">
+  <link rel="stylesheet" href="styles.css?v=da0d9b87a533">
   <script defer src="calculator.js?v=87c867e3674c"></script>
   <script defer src="draft.js?v=9255ac400775"></script>
   <script defer src="objects.js?v=66588a36987f"></script>
   <script defer src="app.js?v=c8b518bb3cbe"></script>
   <script defer src="library.js?v=14c456671901"></script>
-  <script defer src="comparison.js?v=a98da5dcfc64"></script>
-  <script defer src="report.js?v=2742b69d08f3"></script>
+  <script defer src="comparison.js?v=afbf43675f4a"></script>
+  <script defer src="report.js?v=af74ff9a6700"></script>
   <script defer src="share.js?v=58faa93c4f7c"></script>
 </head>
 <body>
@@ -73,7 +73,7 @@
               <span id="purchasePrice-error" class="field-error" hidden>Введите число от 0.</span>
             </div>
             <div class="field">
-              <label for="salePrice">Ожидаемая цена сделки</label>
+              <label for="salePrice">Ожидаемая цена продажи</label>
               <div class="input-wrap">
                 <input type="text" inputmode="decimal" data-money id="salePrice" name="salePrice" data-amount aria-describedby="salePrice-unit" aria-errormessage="salePrice-error">
                 <span id="salePrice-unit" class="unit">₽</span>
@@ -218,7 +218,10 @@
           </div>
         </fieldset>
         <details class="object-details">
-          <summary>Данные об объекте</summary>
+          <summary>
+            Данные об объекте
+            <span class="object-details-hint">Название, ссылка на объявление, ЖК или адрес, спальни, справочные цены и заметка.</span>
+          </summary>
           <div class="fields two-fields">
             <div class="field">
               <label for="objectName">Название объекта</label>
@@ -254,7 +257,7 @@
               <span id="listingPrice-error" class="field-error" hidden>Введите число от 0.</span>
             </div>
             <div class="field">
-              <label for="askingPrice">Цена выставления</label>
+              <label for="askingPrice">Плановая цена в объявлении о продаже</label>
               <div class="input-wrap">
                 <input type="text" inputmode="decimal" data-money id="askingPrice" name="askingPrice" data-amount aria-describedby="askingPrice-unit" aria-errormessage="askingPrice-error">
                 <span id="askingPrice-unit" class="unit">₽</span>
@@ -281,7 +284,7 @@
           <legend>Цена, ремонт и срок</legend>
           <div class="fields two-fields">
             <div class="field">
-              <label for="scenario-salePrice">Ожидаемая цена сделки</label>
+              <label for="scenario-salePrice">Ожидаемая цена продажи</label>
               <div class="input-wrap">
                 <input type="text" inputmode="decimal" data-money id="scenario-salePrice" name="salePrice" aria-describedby="scenario-salePrice-unit scenario-salePrice-base" aria-errormessage="scenario-salePrice-error">
                 <span id="scenario-salePrice-unit" class="unit">₽</span>
