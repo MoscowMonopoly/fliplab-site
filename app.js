@@ -8,7 +8,14 @@ const scenarioFields = [...scenarioForm.querySelectorAll('input')];
 const baseMode = document.querySelector('#base-mode');
 const scenarioMode = document.querySelector('#scenario-mode');
 const draftStatus = document.querySelector('#draft-status');
+const resultSaveStatus = document.querySelector('#result-save-status');
+const results = document.querySelector('#results');
 const resultsTitle = document.querySelector('#results-title');
+const resultsJump = document.querySelector('#results-jump');
+const resultState = document.querySelector('#result-state');
+const resultError = document.querySelector('#result-error');
+const fixCalculation = document.querySelector('#fix-calculation');
+const firstStepHint = document.querySelector('#first-step-hint');
 const resultValues = [...document.querySelectorAll('[data-result]')];
 const costValues = [...document.querySelectorAll('[data-cost]')];
 const repairOutput = document.querySelector('#repair-cost');
@@ -28,6 +35,7 @@ const addWorkButton = document.querySelector('#add-work');
 const workBreakdownRow = document.querySelector('#work-breakdown-row');
 const workBreakdown = workBreakdownRow.querySelector('[data-work-breakdown]');
 const moneyDisplay = new WeakMap();
+const resultNotes = new Map();
 let lastWorkId = 0;
 let previousDraft;
 let editingSavedObject = false;
@@ -68,21 +76,21 @@ const costNames = {
   otherExpenses: 'прочие расходы',
 };
 
-function getFieldValue(input) {
+function validateField(input) {
   const { value, invalid } = validatedAmount(input.name, input.value);
   input.setAttribute('aria-invalid', String(invalid));
   document.getElementById(input.getAttribute('aria-errormessage')).hidden = !invalid;
-  return value;
+  return { value, invalid };
 }
 
 function renderWorkBreakdown(works) {
-  const rows = works.map(({ name, amount }, index) => {
+  const rows = works.map(({ name, amount, invalid }, index) => {
     const row = document.createElement('div');
     row.className = 'cost-row';
     const label = document.createElement('dt');
     label.textContent = name || `Работа ${index + 1}`;
     const value = document.createElement('dd');
-    value.textContent = amount === null ? 'Не учтено' : formatMoney(amount);
+    value.textContent = invalid ? 'Ошибка ввода' : amount === null ? 'Не учтено' : formatMoney(amount);
     row.append(label, value);
     return row;
   });
@@ -92,47 +100,66 @@ function renderWorkBreakdown(works) {
 
 function renderCosts(result, works) {
   const costs = { ...result.costs, repairCost: result.repairCost };
-  const uncounted = result.uncountedCosts;
+  const uncounted = result.missingCosts;
 
   for (const element of costValues) {
     const key = element.dataset.cost;
     const amount = costs[key];
-    element.textContent = uncounted.includes(key) ? 'Не учтено' : (amount === null ? '—' : formatMoney(amount));
+    element.textContent = result.errors[key] ? 'Ошибка ввода'
+      : result.state !== 'empty' && uncounted.includes(key) ? 'Не учтено'
+        : amount === null ? '—' : formatMoney(amount);
   }
   renderWorkBreakdown(works);
-  preliminary.hidden = uncounted.length === 0;
+  preliminary.hidden = result.state === 'empty' || uncounted.length === 0;
   uncountedMessage.textContent = uncounted.length === 0
     ? ''
     : `В себестоимости пока не учтены ${costList.format(uncounted.map((key) => costNames[key]))}.`;
 }
 
-function readScenarioOverrides(baseValues, baseResult) {
-  const inherited = { ...baseValues, repairBudget: baseResult.repairCost, months: baseResult.months };
-  const overrides = {};
+const scenarioControls = scenarioFields.map((input) => {
+  const reference = document.getElementById(`${input.id}-base`);
+  const reset = document.createElement('button');
+  reset.type = 'button';
+  reset.className = 'text-button scenario-reset';
+  reset.textContent = 'К базе';
+  reset.setAttribute('aria-label', `Сбросить к базе: ${input.labels[0].textContent}`);
+  reset.hidden = true;
+  reset.addEventListener('click', () => {
+    setEditorValue(input, '');
+    input.focus();
+    editorChanged();
+  });
+  reference.after(reset);
+  return { input, reference, reset };
+});
 
-  for (const input of scenarioFields) {
-    const value = inherited[input.name];
-    const baseAmount = Number.isFinite(value) ? amount.format(value) : null;
-    input.placeholder = baseAmount ?? 'Не задано в базе';
-    document.getElementById(`${input.id}-base`).textContent = baseAmount === null
-      ? 'В базе значение не задано.'
-      : `Базовое значение — ${baseAmount}.`;
-    const override = getFieldValue(input);
-    if (input.value.trim() !== '') overrides[input.name] = override;
+function renderScenarioFields(draft, base) {
+  for (const { input, reference, reset } of scenarioControls) {
+    const { name } = input;
+    const raw = validatedAmount(name, draft.base[name] ?? '');
+    const value = name === 'repairBudget' ? base.repairCost : name === 'months' ? base.months : raw.value;
+    const invalid = raw.invalid || (name === 'repairBudget' && base.errors.repairCost) || (name === 'months' && base.errors.months);
+    const pretty = !(value === null || invalid)
+      ? input.matches('[data-money]') ? formatMoney(value)
+        : name === 'commissionRate' ? formatPercent(value / 100) : formatters.months(value)
+      : null;
+    reference.textContent = `В базе: ${invalid ? 'ошибка ввода' : pretty ?? 'не задано'}`;
+    reset.hidden = !input.value.trim();
+    validateField(input);
   }
-  return overrides;
 }
 
 function renderProfitComparison(isScenario, base, result) {
   baseProfitRow.hidden = !isScenario || base.profit === null;
-  baseProfitStatus.hidden = base.uncountedCosts.length === 0;
+  baseProfitStatus.textContent = metricNote(base, 'profit');
+  baseProfitStatus.hidden = !baseProfitStatus.textContent;
   baseProfitValue.textContent = base.profit === null ? '—' : formatMoney(base.profit);
 
   const difference = base.profit === null || result.profit === null
     ? null
     : finiteOrNull(result.profit - base.profit);
   profitDifferenceRow.hidden = !isScenario || difference === null;
-  profitDifferenceStatus.hidden = base.uncountedCosts.length === 0 && result.uncountedCosts.length === 0;
+  profitDifferenceStatus.hidden = !metricNote(base, 'profit') && !metricNote(result, 'profit');
   profitDifferenceValue.textContent = difference === null ? '—' : signedCurrency.format(difference);
 }
 
@@ -144,33 +171,65 @@ function workFields() {
 }
 
 function renderDeal() {
-  const values = Object.fromEntries(fields.map((input) => [input.name, getFieldValue(input)]));
-  const works = workFields().map(({ nameInput, amountInput }) => ({
-    name: nameInput.value.trim(),
-    amount: getFieldValue(amountInput),
-  }));
-  values.extraWorks = works.map(({ amount }) => amount);
-  const base = calculateDeal(values);
+  fields.forEach(validateField);
+  const works = workFields().map(({ nameInput, amountInput }) => ({ name: nameInput.value.trim(), ...validateField(amountInput) }));
+  const draft = currentDraft();
+  const { base, scenario } = calculateDraftComparison(draft);
   const isScenario = !scenarioForm.hidden;
-  const overrides = isScenario ? readScenarioOverrides(values, base) : {};
-  const result = isScenario ? calculateDeal({ ...values, ...overrides }) : base;
-  const overridesRepair = Object.hasOwn(overrides, 'repairBudget');
+  const result = isScenario && scenario ? scenario : base;
+  const overridesRepair = isScenario && Boolean(draft.scenario.repairBudget.trim());
+  renderScenarioFields(draft, base);
 
   const baseRepair = base.costs.baseRepairCost;
-  repairOutput.value = baseRepair === null ? '—' : formatMoney(baseRepair);
+  repairOutput.value = base.errors.baseRepairCost ? 'Ошибка ввода' : baseRepair === null ? '—' : formatMoney(baseRepair);
   for (const element of resultValues) {
     const key = element.dataset.result;
     element.textContent = result[key] === null ? '—' : formatters[key](result[key]);
+    const note = resultNotes.get(key);
+    note.textContent = metricNote(result, key);
+    note.hidden = !note.textContent;
+    note.dataset.error = String(Boolean(result.errors[key]));
   }
+  renderResultState(result, draft);
   profitCard.classList.toggle('loss', result.profit < 0);
   baseRepairRow.hidden = overridesRepair;
   renderCosts(result, overridesRepair ? [] : works);
   renderProfitComparison(isScenario, base, result);
+  const started = hasDraftValues(draft);
+  form.dataset.started = String(started);
+  firstStepHint.hidden = started;
+  document.dispatchEvent(new Event('fliplab:editor-rendered'));
+}
+
+const resultStateLabels = {
+  empty: 'Введите исходные данные, чтобы увидеть расчёт.',
+  invalid: 'Ошибка в исходных данных',
+  preliminary: 'Предварительный расчёт',
+  complete: 'Расчёт готов',
+};
+
+function renderResultState(result, draft) {
+  results.dataset.state = result.state;
+  const state = resultStateLabels[result.state];
+  if (resultState.textContent !== state) resultState.textContent = state;
+  const field = result.errors.salePrice || result.errors.profit || Object.values(result.errors).find(Boolean);
+  const control = field === 'extraWorks' ? workList.querySelector('[data-work-amount][aria-invalid="true"]')
+    : document.getElementById(`${draft.mode === 'scenario' && draft.scenario[field]?.trim() ? 'scenario-' : ''}${field}`);
+  resultError.hidden = !control;
+  if (control) {
+    fixCalculation.textContent = `Проверьте поле «${control.labels[0].textContent}»`;
+    fixCalculation.dataset.input = control.id;
+  }
 }
 
 function showDraftStatus(message, error = false) {
   if (draftStatus.textContent !== message) draftStatus.textContent = message;
   draftStatus.setAttribute('data-error', String(error));
+}
+
+function showResultSaveStatus(message, error = false) {
+  resultSaveStatus.textContent = message;
+  resultSaveStatus.dataset.error = String(error);
 }
 
 function editorValue(input) {
@@ -262,10 +321,12 @@ function openEditor(snapshot, savedObject = false) {
   applyDraftValues(snapshot ?? emptyDraft);
   showScenario(snapshot?.mode === 'scenario');
   if (!savedObject) previousDraft = currentDraft();
+  showResultSaveStatus('');
   renderDeal();
 }
 
 function editorChanged(replaceBase = false) {
+  showResultSaveStatus('');
   if (editingSavedObject) {
     renderDeal();
     showDraftStatus('Сохраните изменения объекта.');
@@ -361,9 +422,49 @@ baseMode.addEventListener('click', () => changeMode(false));
 scenarioMode.addEventListener('click', () => changeMode(true));
 window.addEventListener('pageshow', renderDeal);
 
+for (const value of resultValues) {
+  const key = value.dataset.result;
+  const note = document.createElement('small');
+  note.id = `result-note-${key}`;
+  note.className = 'metric-note';
+  value.parentElement.querySelector('dt').append(note);
+  value.setAttribute('aria-describedby', note.id);
+  resultNotes.set(key, note);
+}
+
+function focusEditorControl(control) {
+  control.focus({ preventScroll: true });
+  control.scrollIntoView({ block: 'start' });
+}
+
+fixCalculation.addEventListener('click', () => {
+  const input = document.getElementById(fixCalculation.dataset.input);
+  const targetScenario = scenarioForm.contains(input);
+  if (targetScenario !== form.hidden) changeMode(targetScenario);
+  const disclosure = input.closest('details');
+  if (disclosure) disclosure.open = true;
+  focusEditorControl(input);
+});
+
+for (const link of document.querySelectorAll('[data-edit-inputs]')) {
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+    if (document.querySelector('#calculator-view').hidden) document.querySelector('#calculator-tab').click();
+    focusEditorControl(document.querySelector(form.hidden ? '#scenario-title' : '#form-title'));
+  });
+}
+
+resultsJump.addEventListener('click', (event) => {
+  event.preventDefault();
+  focusEditorControl(results);
+});
+
+new IntersectionObserver(([entry]) => {
+  resultsJump.hidden = entry.isIntersecting;
+}).observe(results);
+
 function hasBaseValues(draft) {
-  return draft !== null && (Object.values(draft.base).some((value) => typeof value === 'string' && value !== '')
-    || draft.works.length !== 0);
+  return draft !== null && hasDraftValues({ ...draft, scenario: {} });
 }
 
 document.querySelector('#load-example').addEventListener('click', () => {

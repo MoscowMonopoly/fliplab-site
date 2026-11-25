@@ -5,6 +5,7 @@ const comparisonCaption = comparisonTable.querySelector('caption');
 const comparisonScroll = document.querySelector('#comparison-scroll');
 const comparisonScrollHint = document.querySelector('#comparison-scroll-hint');
 const comparisonStatus = document.querySelector('#comparison-status');
+const comparisonCount = document.querySelector('#comparison-count');
 const backToObjects = document.querySelector('#back-to-objects');
 const shareComparisonButton = document.querySelector('#share-comparison');
 const signedDuration = new Intl.NumberFormat('ru-RU', { maximumSignificantDigits: 12, signDisplay: 'exceptZero' });
@@ -21,20 +22,22 @@ function displayComparisonValue(value, formatter) {
   return value === null ? '—' : formatter(value);
 }
 
-function compareProfitEntry(label, result) {
+function compareMetricEntry(label, result, key, format) {
   const entry = document.createElement('div');
   entry.append(
     comparisonText('small', label),
-    comparisonText('strong', result === null ? 'Не задано' : displayComparisonValue(result.profit, formatMoney)),
+    comparisonText('strong', result === null ? 'Не задано' : displayComparisonValue(result[key], format)),
   );
-  if (result?.uncountedCosts.length) entry.append(comparisonText('small', 'Предварительный расчёт', 'comparison-preliminary'));
+  const note = result && metricNote(result, key);
+  if (note) entry.append(comparisonText('small', note, result.errors[key] ? 'comparison-error' : 'comparison-preliminary'));
   return entry;
 }
 
-function compareProfits({ base, scenario }) {
+function compareMetric({ base, scenario }, key, format) {
   const group = document.createElement('div');
-  group.className = 'comparison-profits';
-  group.append(compareProfitEntry('База', base), compareProfitEntry('Что если?', scenario));
+  group.className = 'comparison-metrics';
+  group.append(compareMetricEntry('База', base, key, format));
+  if (scenario || key === 'profit') group.append(compareMetricEntry('Что если?', scenario, key, format));
   return group;
 }
 
@@ -50,8 +53,8 @@ function compareChange(result, key, formatValue, formatDelta) {
 function compareUncounted({ base, scenario }) {
   const groups = document.createElement('div');
   groups.className = 'comparison-missing';
-  const baseCosts = base.uncountedCosts;
-  const scenarioCosts = scenario?.uncountedCosts ?? [];
+  const baseCosts = base.state === 'empty' ? [] : base.missingCosts;
+  const scenarioCosts = scenario?.missingCosts ?? [];
   if (!baseCosts.length && !scenarioCosts.length) return '—';
 
   const sameCosts = baseCosts.length === scenarioCosts.length && baseCosts.every((key) => scenarioCosts.includes(key));
@@ -66,12 +69,12 @@ function compareUncounted({ base, scenario }) {
 }
 
 const compareRows = [
-  ['Прибыль', compareProfits],
-  ['Цена покупки', ({ base }) => displayComparisonValue(base.costs.purchasePrice, formatMoney)],
-  ['Себестоимость', ({ base }) => displayComparisonValue(base.totalCost, formatMoney)],
-  ['Цена сделки', ({ base }) => displayComparisonValue(base.salePrice, formatMoney)],
-  ['Рентабельность', ({ base }) => displayComparisonValue(base.returnOnCost, formatPercent)],
-  ['Общий срок', ({ base }) => displayComparisonValue(base.months, formatters.months)],
+  ['Прибыль', (result) => compareMetric(result, 'profit', formatMoney)],
+  ['Цена покупки · база', ({ base }) => displayComparisonValue(base.costs.purchasePrice, formatMoney)],
+  ['Себестоимость', (result) => compareMetric(result, 'totalCost', formatMoney)],
+  ['Цена сделки · база', ({ base }) => displayComparisonValue(base.salePrice, formatMoney)],
+  ['Рентабельность', (result) => compareMetric(result, 'returnOnCost', formatPercent)],
+  ['Общий срок', (result) => compareMetric(result, 'months', formatters.months)],
   ['Изменение цены сделки', (result) => compareChange(result, 'salePrice', formatMoney, (value) => signedCurrency.format(value))],
   ['Изменение ремонта', (result) => compareChange(result, 'repairCost', formatMoney, (value) => signedCurrency.format(value))],
   ['Изменение срока', (result) => compareChange(result, 'months', formatters.months, (value) => `${signedDuration.format(value)}\u00a0мес.`)],
@@ -95,6 +98,7 @@ function comparisonHeader(records) {
     const name = objectName(record);
     const open = comparisonText('button', name, 'comparison-open');
     open.type = 'button';
+    open.title = name;
     open.setAttribute('data-compare-object', record.id);
     open.setAttribute('aria-label', `Открыть «${name}»`);
     open.addEventListener('click', () => openSavedObject(record.id, showComparisonStatus));
@@ -121,16 +125,26 @@ function renderComparison(records) {
     body.append(row);
   }
   comparisonTable.style.setProperty('--comparison-count', records.length);
+  comparisonTable.dataset.many = String(records.length > 2);
   comparisonTable.replaceChildren(comparisonCaption, comparisonHeader(records), body);
   comparisonScroll.hidden = false;
   displayedComparisonRecords = records;
   shareComparisonButton.hidden = false;
+  comparisonCount.textContent = `Выбрано: ${records.length}`;
+  comparisonCount.hidden = false;
+  updateComparisonOverflow();
+}
+
+function updateComparisonOverflow() {
+  comparisonScrollHint.hidden = comparisonScroll.hidden || comparisonView.hidden
+    || comparisonScroll.scrollWidth <= comparisonScroll.clientWidth + 1;
 }
 
 function refreshComparison() {
   const focusedId = document.activeElement?.getAttribute('data-compare-object');
   let records;
   comparisonScrollHint.hidden = true;
+  comparisonCount.hidden = true;
   displayedComparisonRecords = [];
   shareComparisonButton.hidden = true;
   try {
@@ -149,7 +163,6 @@ function refreshComparison() {
   }
   showComparisonStatus('');
   renderComparison(records);
-  comparisonScrollHint.hidden = records.length < 3;
   if (focusedId) {
     const buttons = [...comparisonTable.querySelectorAll('[data-compare-object]')];
     const nextFocus = buttons.find((button) => button.getAttribute('data-compare-object') === focusedId);
@@ -161,7 +174,11 @@ compareButton.addEventListener('click', () => {
   refreshComparison();
   showView('comparison');
   comparisonScroll.scrollLeft = 0;
+  updateComparisonOverflow();
 });
+const observeComparisonSize = new ResizeObserver(updateComparisonOverflow);
+observeComparisonSize.observe(comparisonScroll);
+observeComparisonSize.observe(comparisonTable);
 backToObjects.addEventListener('click', openObjectList);
 window.addEventListener('storage', ({ key }) => {
   if (!comparisonView.hidden && (key === OBJECTS_KEY || key === null)) refreshComparison();

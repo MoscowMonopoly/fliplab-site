@@ -35,8 +35,13 @@ function reportMetricsRows(results, format) {
 }
 
 function reportWarnings(result, format) {
-  const costs = result?.uncountedCosts ?? [];
-  return costs.length ? format.costs(costs) : '';
+  if (!result || result.state === 'empty') return '';
+  const costs = result.missingCosts;
+  return [
+    result.state === 'invalid' ? 'Ошибка в исходных данных'
+      : result.state === 'preliminary' ? 'Предварительный расчёт' : '',
+    costs.length ? `Не учтено: ${format.costs(costs)}` : '',
+  ].filter(Boolean).join('. ');
 }
 
 function reportTable(columns, rows) {
@@ -84,7 +89,7 @@ function reportDeal(record, format) {
   return [
     { text: record.name, style: 'subtitle' },
     reportTable(columns, rows),
-    ...(warnings.length ? [{ text: 'Предварительный расчёт', style: 'warning' }, { text: `Не учтено: ${warnings.join('\n')}` }] : []),
+    ...(warnings.length ? [{ text: warnings.join('\n'), style: 'warning' }] : []),
   ];
 }
 
@@ -113,12 +118,11 @@ function reportComparison(records, format) {
     const scenarioCosts = reportWarnings(scenario, format);
     if (!baseCosts && !scenarioCosts) return '—';
     return { stack: [
-      { text: 'Предварительный расчёт', style: 'warningCell' },
       ...(baseCosts ? [{ text: `База — ${baseCosts}` }] : []),
       ...(scenarioCosts ? [{ text: `Что если? — ${scenarioCosts}` }] : []),
     ] };
   });
-  if (warnings.some((value) => value !== '—')) rows.push(['Не учтено', ...warnings]);
+  if (warnings.some((value) => value !== '—')) rows.push(['Статус расчёта', ...warnings]);
   return reportTable(records.map(({ name }) => name), rows);
 }
 
@@ -154,7 +158,6 @@ function createReportDocument(drafts, { comparison = false, details = {} }, form
       tableHeader: { bold: true, fillColor: '#eaf0e7', color: '#1b3b30' },
       profit: { bold: true, color: '#1b3b30' },
       warning: { bold: true, color: '#963b2d', margin: [0, 13, 0, 4] },
-      warningCell: { bold: true, color: '#963b2d' },
       detailHeading: { bold: true, fontSize: 13, margin: [0, 16, 0, 0] },
       detailLabel: { bold: true, margin: [0, 9, 0, 3] },
     },

@@ -12,6 +12,17 @@ const sharedAmounts = [
 const baseAmounts = [...sharedAmounts, 'area', 'repairRate', 'preparationMonths', 'renovationMonths', 'saleMonths'];
 const scenarioAmounts = [...sharedAmounts, 'repairBudget'];
 const amountGroupSeparator = /[ \u00a0\u202f]/g;
+const expenseInputs = {
+  purchaseExpenses: 'purchaseExpenses', saleExpenses: 'saleExpenses',
+  loanInterest: 'loanInterest', tax: 'tax', otherExpenses: 'otherExpenses',
+};
+
+function hasDraftValues(draft) {
+  return Boolean(draft && [
+    ...Object.values(draft.base), ...Object.values(draft.scenario),
+    ...draft.works.flatMap((row) => [row?.name, row?.amount]),
+  ].some((value) => typeof value === 'string' && value.trim()));
+}
 
 function parseAmount(raw) {
   const value = raw.trim();
@@ -95,14 +106,54 @@ function multiplyKnown(left, right) {
   return left !== null && right !== null ? finiteOrNull(left * right) : null;
 }
 
-function storedBaseAmounts(draft) {
-  const values = Object.fromEntries(baseAmounts.map((name) => [name, validatedAmount(name, draft.base[name] ?? '').value]));
-  values.extraWorks = draft.works.map(({ amount }) => validatedAmount('', amount).value);
-  return values;
+function readAmounts(fields, names) {
+  return Object.fromEntries(names.map((name) => [name, validatedAmount(name, fields[name] ?? '')]));
 }
 
-function calculateStoredBase(draft) {
-  return calculateDeal(storedBaseAmounts(draft));
+function evaluateDraftAmounts(inputs, workInputs, hasValues) {
+  const values = Object.fromEntries(Object.entries(inputs).map(([key, { value }]) => [key, value]));
+  values.extraWorks = workInputs.map(({ value }) => value);
+  const result = calculateDeal(values);
+  const invalid = (name) => inputs[name]?.invalid ? name : undefined;
+  const stages = ['preparationMonths', 'renovationMonths', 'saleMonths'];
+  const months = values.months === null ? stages.find(invalid) : invalid('months');
+  const baseRepairCost = values.repairBudget === undefined ? ['area', 'repairRate'].find(invalid) : undefined;
+  const extraWorks = values.repairBudget === undefined && workInputs.some(({ invalid }) => invalid) ? 'extraWorks' : undefined;
+  const repairCost = invalid('repairBudget') || baseRepairCost || extraWorks;
+  const commissionCost = (values.commissionRate > 0 && invalid('salePrice')) || invalid('commissionRate');
+  const holdingCost = invalid('monthlyHolding') || (values.monthlyHolding > 0 ? months : undefined);
+  const purchasePrice = invalid('purchasePrice');
+  const salePrice = invalid('salePrice');
+  const expenses = Object.fromEntries(Object.entries(expenseInputs).map(([key, name]) => [key, invalid(name)]));
+  const otherCosts = [purchasePrice, repairCost, holdingCost, ...Object.values(expenses)].find(Boolean);
+  const totalCost = commissionCost || otherCosts;
+  const profit = salePrice || totalCost;
+  const errors = {
+    ...expenses, purchasePrice, salePrice, baseRepairCost, extraWorks, repairCost, commissionCost, holdingCost,
+    totalCost, profit, returnOnCost: profit, annualReturn: profit || months, months,
+    breakEvenPrice: invalid('commissionRate') || otherCosts,
+  };
+  const missingCosts = result.uncountedCosts.filter((key) => !errors[key]);
+  const commissionMissing = values.commissionRate === null && !invalid('commissionRate');
+  for (const [key, error] of Object.entries(errors)) {
+    if (!error) continue;
+    if (Object.hasOwn(result, key)) result[key] = null;
+    if (Object.hasOwn(result.costs, key)) result.costs[key] = null;
+  }
+  const state = Object.values(errors).some(Boolean) ? 'invalid'
+    : !hasValues ? 'empty'
+      : result.profit === null || result.months === null || missingCosts.length ? 'preliminary' : 'complete';
+  return { ...result, salePrice: values.salePrice, errors, missingCosts, commissionMissing, state };
+}
+
+function metricNote(result, key) {
+  if (result.errors[key]) return 'Ошибка ввода';
+  if (key === 'months' || result[key] === null) return '';
+  if (result.commissionMissing) return 'Без учёта комиссии';
+  const missing = key === 'breakEvenPrice'
+    ? result.missingCosts.some((cost) => cost !== 'commissionCost')
+    : result.missingCosts.length > 0;
+  return missing ? 'Предварительно' : '';
 }
 
 function changeFromBase(base, scenario) {
@@ -110,17 +161,14 @@ function changeFromBase(base, scenario) {
 }
 
 function calculateDraftComparison(draft) {
-  const values = storedBaseAmounts(draft);
-  const base = { ...calculateDeal(values), salePrice: values.salePrice };
-  const overrides = {};
-  for (const name of scenarioAmounts) {
-    const raw = draft.scenario[name];
-    if (raw?.trim()) overrides[name] = validatedAmount(name, raw).value;
-  }
-  if (Object.keys(overrides).length === 0) return { base, scenario: null, differences: null };
+  const inputs = readAmounts(draft.base, baseAmounts);
+  const workInputs = draft.works.map(({ amount }) => validatedAmount('', amount));
+  const base = evaluateDraftAmounts(inputs, workInputs, hasDraftValues({ ...draft, scenario: {} }));
+  const overrideNames = scenarioAmounts.filter((name) => draft.scenario[name]?.trim());
+  if (overrideNames.length === 0) return { base, scenario: null, differences: null };
 
-  const next = { ...values, ...overrides };
-  const scenario = { ...calculateDeal(next), salePrice: next.salePrice };
+  const overrides = readAmounts(draft.scenario, overrideNames);
+  const scenario = evaluateDraftAmounts({ ...inputs, ...overrides }, workInputs, true);
   return {
     base,
     scenario,
@@ -133,5 +181,5 @@ function calculateDraftComparison(draft) {
 }
 
 if (typeof module === 'object' && module.exports) {
-  module.exports = { calculateDeal, calculateDraftComparison, formatMoneyInput, parseAmount };
+  module.exports = { calculateDeal, calculateDraftComparison, formatMoneyInput, hasDraftValues, metricNote, parseAmount };
 }

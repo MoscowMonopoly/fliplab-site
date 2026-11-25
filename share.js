@@ -8,6 +8,7 @@ const shareFields = [...shareOptions.querySelectorAll('input')];
 const shareStatus = document.querySelector('#share-status');
 const shareConfirm = document.querySelector('#share-confirm');
 const shareClose = document.querySelector('#share-close');
+const shareIncluded = document.querySelector('#share-included');
 
 const shareFormat = {
   calculate: calculateDraftComparison,
@@ -21,6 +22,7 @@ let pdfLibrary;
 let shareSelection;
 let preparedReport;
 let reportVersion = 0;
+let shareOpener;
 
 function loadReportScript(src) {
   return new Promise((resolve, reject) => {
@@ -61,6 +63,8 @@ async function prepareReport() {
   const version = ++reportVersion;
   const { drafts, comparison } = shareSelection;
   const details = Object.fromEntries(shareFields.map(({ name, checked }) => [name, checked]));
+  const included = shareFields.filter(({ checked }) => checked).map((field) => field.labels[0].textContent.trim().toLowerCase());
+  shareIncluded.textContent = included.length ? `Дополнительно в PDF: ${costList.format(included)}.` : 'В PDF только показатели и названия объектов.';
   preparedReport = undefined;
   shareConfirm.disabled = true;
   shareConfirm.textContent = 'Подготовить PDF';
@@ -88,7 +92,8 @@ async function prepareReport() {
   shareConfirm.disabled = false;
 }
 
-function openShareDialog(drafts, comparison = false) {
+function openShareDialog(opener, drafts, comparison = false) {
+  shareOpener = opener;
   shareSelection = { drafts, comparison };
   shareTitle.textContent = comparison ? 'Поделиться сравнением' : 'Поделиться расчётом';
   for (const field of shareFields) {
@@ -96,8 +101,8 @@ function openShareDialog(drafts, comparison = false) {
     field.parentElement.hidden = !drafts.some(({ base }) => base[field.name]?.trim());
   }
   shareOptions.hidden = shareFields.every((field) => field.parentElement.hidden);
-  shareDialog.showModal();
   prepareReport();
+  shareDialog.showModal();
 }
 
 async function confirmShare() {
@@ -132,10 +137,10 @@ async function confirmShare() {
   }
 }
 
-shareDealButton.addEventListener('click', () => openShareDialog([currentDraft()]));
-shareComparisonButton.addEventListener('click', () => {
+shareDealButton.addEventListener('click', ({ currentTarget }) => openShareDialog(currentTarget, [currentDraft()]));
+shareComparisonButton.addEventListener('click', ({ currentTarget }) => {
   if (displayedComparisonRecords.length >= 2) {
-    openShareDialog(displayedComparisonRecords.map(({ draft }) => draft), true);
+    openShareDialog(currentTarget, displayedComparisonRecords.map(({ draft }) => draft), true);
   }
 });
 shareOptions.addEventListener('change', prepareReport);
@@ -146,4 +151,6 @@ shareDialog.addEventListener('close', () => {
   reportVersion++;
   shareSelection = undefined;
   preparedReport = undefined;
+  shareOpener?.focus({ preventScroll: true });
+  shareOpener = undefined;
 });

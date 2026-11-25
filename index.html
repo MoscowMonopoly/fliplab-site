@@ -5,17 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f6f2">
   <title>FlipLab — калькулятор флип-сделки</title>
-  <link rel="stylesheet" href="styles.css?v=44fc214d0c4c">
-  <script defer src="calculator.js?v=9fb7dde94ac4"></script>
+  <link rel="stylesheet" href="styles.css?v=1d23bff37801">
+  <script defer src="calculator.js?v=87c867e3674c"></script>
   <script defer src="draft.js?v=9255ac400775"></script>
   <script defer src="objects.js?v=66588a36987f"></script>
-  <script defer src="app.js?v=3b09f6cc5c6f"></script>
-  <script defer src="library.js?v=17a3763165dd"></script>
-  <script defer src="comparison.js?v=5a5a1c3d70dd"></script>
-  <script defer src="report.js?v=23a216e831bf"></script>
-  <script defer src="share.js?v=ca50bd07cda2"></script>
+  <script defer src="app.js?v=c8b518bb3cbe"></script>
+  <script defer src="library.js?v=14c456671901"></script>
+  <script defer src="comparison.js?v=a98da5dcfc64"></script>
+  <script defer src="report.js?v=2742b69d08f3"></script>
+  <script defer src="share.js?v=58faa93c4f7c"></script>
 </head>
 <body>
+  <a class="skip-link" href="#deal-form" data-edit-inputs>К исходным данным</a>
   <header class="site-header">
     <div class="shell site-bar">
       <div class="brand">
@@ -38,8 +39,8 @@
     <noscript><p class="noscript">Включите JavaScript в браузере, чтобы рассчитать сделку.</p></noscript>
 
     <div class="editor-actions">
-      <button type="button" class="primary-button" id="save-object">Сохранить объект</button>
-      <button type="button" class="example-button" id="leave-object" hidden>К черновику</button>
+      <button type="button" class="primary-button" id="save-object" disabled>Сохранить объект</button>
+      <button type="button" class="example-button" id="leave-object" hidden>Продолжить черновик</button>
     </div>
     <p id="draft-status" class="draft-status" role="status"></p>
 
@@ -50,42 +51,34 @@
       </div>
     </div>
 
-    <a class="results-jump" href="#results">К результатам <span aria-hidden="true">↓</span></a>
+    <a class="results-jump" href="#results" id="results-jump">К результатам <span aria-hidden="true">↓</span></a>
 
     <div class="workspace">
       <form id="deal-form" class="card form-card" aria-labelledby="form-title" autocomplete="off" novalidate>
         <div class="form-heading">
-          <h2 id="form-title">Исходные данные</h2>
+          <h2 id="form-title" tabindex="-1">Исходные данные</h2>
           <button class="example-button" type="button" id="load-example">Заполнить пример</button>
         </div>
 
-        <fieldset>
-          <legend>Объект и покупка</legend>
+        <fieldset class="first-step">
+          <legend>Основные параметры сделки</legend>
+          <p class="group-hint first-step-hint" id="first-step-hint">Начните с цен покупки и продажи, площади и ставки ремонта.</p>
           <div class="fields two-fields">
             <div class="field">
-              <label for="objectName">Название объекта</label>
+              <label for="purchasePrice">Ожидаемая цена покупки</label>
               <div class="input-wrap">
-                <input type="text" id="objectName" name="objectName">
+                <input type="text" inputmode="decimal" data-money id="purchasePrice" name="purchasePrice" data-amount aria-describedby="purchasePrice-unit" aria-errormessage="purchasePrice-error">
+                <span id="purchasePrice-unit" class="unit">₽</span>
               </div>
+              <span id="purchasePrice-error" class="field-error" hidden>Введите число от 0.</span>
             </div>
             <div class="field">
-              <label for="listingUrl">Ссылка на объявление</label>
+              <label for="salePrice">Ожидаемая цена сделки</label>
               <div class="input-wrap">
-                <input type="url" id="listingUrl" name="listingUrl">
+                <input type="text" inputmode="decimal" data-money id="salePrice" name="salePrice" data-amount aria-describedby="salePrice-unit" aria-errormessage="salePrice-error">
+                <span id="salePrice-unit" class="unit">₽</span>
               </div>
-            </div>
-            <div class="field">
-              <label for="location">ЖК или местоположение</label>
-              <div class="input-wrap">
-                <input type="text" id="location" name="location">
-              </div>
-            </div>
-            <div class="field">
-              <label for="bedrooms">Число спален</label>
-              <div class="input-wrap">
-                <input type="text" inputmode="numeric" id="bedrooms" name="bedrooms" data-amount aria-errormessage="bedrooms-error">
-              </div>
-              <span id="bedrooms-error" class="field-error" hidden>Введите целое число от 0.</span>
+              <span id="salePrice-error" class="field-error" hidden>Введите число от 0.</span>
             </div>
             <div class="field">
               <label for="area">Площадь</label>
@@ -96,20 +89,12 @@
               <span id="area-error" class="field-error" hidden>Введите число больше 0.</span>
             </div>
             <div class="field">
-              <label for="purchasePrice">Ожидаемая цена покупки</label>
+              <label for="repairRate">Ставка ремонта</label>
               <div class="input-wrap">
-                <input type="text" inputmode="decimal" data-money id="purchasePrice" name="purchasePrice" data-amount aria-describedby="purchasePrice-unit" aria-errormessage="purchasePrice-error">
-                <span id="purchasePrice-unit" class="unit">₽</span>
+                <input type="text" inputmode="decimal" data-money id="repairRate" name="repairRate" data-amount aria-describedby="repairRate-unit" aria-errormessage="repairRate-error">
+                <span id="repairRate-unit" class="unit">₽/м²</span>
               </div>
-              <span id="purchasePrice-error" class="field-error" hidden>Введите число от 0.</span>
-            </div>
-            <div class="field">
-              <label for="listingPrice">Цена объявления</label>
-              <div class="input-wrap">
-                <input type="text" inputmode="decimal" data-money id="listingPrice" name="listingPrice" data-amount aria-describedby="listingPrice-unit" aria-errormessage="listingPrice-error">
-                <span id="listingPrice-unit" class="unit">₽</span>
-              </div>
-              <span id="listingPrice-error" class="field-error" hidden>Введите число от 0.</span>
+              <span id="repairRate-error" class="field-error" hidden>Введите число от 0.</span>
             </div>
             <div class="field">
               <label for="purchaseExpenses">Расходы на приобретение</label>
@@ -119,26 +104,12 @@
               </div>
               <span id="purchaseExpenses-error" class="field-error" hidden>Введите число от 0.</span>
             </div>
-            <div class="field field-wide">
-              <label for="layoutNote">Заметка о планировке</label>
-              <div class="input-wrap">
-                <textarea id="layoutNote" name="layoutNote" rows="2"></textarea>
-              </div>
-            </div>
           </div>
         </fieldset>
 
         <fieldset>
           <legend>Ремонт</legend>
           <div class="fields two-fields">
-            <div class="field">
-              <label for="repairRate">Ставка ремонта</label>
-              <div class="input-wrap">
-                <input type="text" inputmode="decimal" data-money id="repairRate" name="repairRate" data-amount aria-describedby="repairRate-unit" aria-errormessage="repairRate-error">
-                <span id="repairRate-unit" class="unit">₽/м²</span>
-              </div>
-              <span id="repairRate-error" class="field-error" hidden>Введите число от 0.</span>
-            </div>
             <div class="repair-preview">
               <span id="repair-label">Базовый ремонт</span>
               <output for="area repairRate" aria-labelledby="repair-label" id="repair-cost">—</output>
@@ -154,22 +125,6 @@
         <fieldset>
           <legend>Продажа</legend>
           <div class="fields two-fields">
-            <div class="field">
-              <label for="askingPrice">Цена выставления</label>
-              <div class="input-wrap">
-                <input type="text" inputmode="decimal" data-money id="askingPrice" name="askingPrice" data-amount aria-describedby="askingPrice-unit" aria-errormessage="askingPrice-error">
-                <span id="askingPrice-unit" class="unit">₽</span>
-              </div>
-              <span id="askingPrice-error" class="field-error" hidden>Введите число от 0.</span>
-            </div>
-            <div class="field">
-              <label for="salePrice">Ожидаемая цена сделки</label>
-              <div class="input-wrap">
-                <input type="text" inputmode="decimal" data-money id="salePrice" name="salePrice" data-amount aria-describedby="salePrice-unit" aria-errormessage="salePrice-error">
-                <span id="salePrice-unit" class="unit">₽</span>
-              </div>
-              <span id="salePrice-error" class="field-error" hidden>Введите число от 0.</span>
-            </div>
             <div class="field">
               <label for="commissionRate">Комиссия</label>
               <div class="input-wrap">
@@ -262,11 +217,63 @@
             </div>
           </div>
         </fieldset>
+        <details class="object-details">
+          <summary>Данные об объекте</summary>
+          <div class="fields two-fields">
+            <div class="field">
+              <label for="objectName">Название объекта</label>
+              <div class="input-wrap">
+                <input type="text" id="objectName" name="objectName">
+              </div>
+            </div>
+            <div class="field">
+              <label for="listingUrl">Ссылка на объявление</label>
+              <div class="input-wrap">
+                <input type="url" id="listingUrl" name="listingUrl">
+              </div>
+            </div>
+            <div class="field">
+              <label for="location">ЖК или местоположение</label>
+              <div class="input-wrap">
+                <input type="text" id="location" name="location">
+              </div>
+            </div>
+            <div class="field">
+              <label for="bedrooms">Число спален</label>
+              <div class="input-wrap">
+                <input type="text" inputmode="numeric" id="bedrooms" name="bedrooms" data-amount aria-errormessage="bedrooms-error">
+              </div>
+              <span id="bedrooms-error" class="field-error" hidden>Введите целое число от 0.</span>
+            </div>
+            <div class="field">
+              <label for="listingPrice">Цена объявления</label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" data-money id="listingPrice" name="listingPrice" data-amount aria-describedby="listingPrice-unit" aria-errormessage="listingPrice-error">
+                <span id="listingPrice-unit" class="unit">₽</span>
+              </div>
+              <span id="listingPrice-error" class="field-error" hidden>Введите число от 0.</span>
+            </div>
+            <div class="field">
+              <label for="askingPrice">Цена выставления</label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" data-money id="askingPrice" name="askingPrice" data-amount aria-describedby="askingPrice-unit" aria-errormessage="askingPrice-error">
+                <span id="askingPrice-unit" class="unit">₽</span>
+              </div>
+              <span id="askingPrice-error" class="field-error" hidden>Введите число от 0.</span>
+            </div>
+            <div class="field field-wide">
+              <label for="layoutNote">Заметка о планировке</label>
+              <div class="input-wrap">
+                <textarea id="layoutNote" name="layoutNote" rows="2"></textarea>
+              </div>
+            </div>
+          </div>
+        </details>
       </form>
 
       <form id="scenario-form" class="card form-card" aria-labelledby="scenario-title" aria-describedby="scenario-hint" autocomplete="off" novalidate hidden>
         <div class="form-heading">
-          <h2 id="scenario-title">Условия сценария</h2>
+          <h2 id="scenario-title" tabindex="-1">Условия сценария</h2>
         </div>
         <p class="group-hint" id="scenario-hint">Пустое поле берёт значение из базы. Введите 0, чтобы задать нулевое значение.</p>
 
@@ -279,7 +286,7 @@
                 <input type="text" inputmode="decimal" data-money id="scenario-salePrice" name="salePrice" aria-describedby="scenario-salePrice-unit scenario-salePrice-base" aria-errormessage="scenario-salePrice-error">
                 <span id="scenario-salePrice-unit" class="unit">₽</span>
               </div>
-              <span id="scenario-salePrice-base" class="visually-hidden"></span>
+              <span id="scenario-salePrice-base" class="scenario-base"></span>
               <span id="scenario-salePrice-error" class="field-error" hidden>Введите число от 0.</span>
             </div>
             <div class="field">
@@ -288,7 +295,7 @@
                 <input type="text" inputmode="decimal" data-money id="scenario-repairBudget" name="repairBudget" aria-describedby="scenario-repairBudget-unit scenario-repairBudget-base" aria-errormessage="scenario-repairBudget-error">
                 <span id="scenario-repairBudget-unit" class="unit">₽</span>
               </div>
-              <span id="scenario-repairBudget-base" class="visually-hidden"></span>
+              <span id="scenario-repairBudget-base" class="scenario-base"></span>
               <span id="scenario-repairBudget-error" class="field-error" hidden>Введите число от 0.</span>
             </div>
             <div class="field">
@@ -297,7 +304,7 @@
                 <input type="text" inputmode="decimal" id="scenario-months" name="months" aria-describedby="scenario-months-unit scenario-months-base" aria-errormessage="scenario-months-error">
                 <span id="scenario-months-unit" class="unit">мес.</span>
               </div>
-              <span id="scenario-months-base" class="visually-hidden"></span>
+              <span id="scenario-months-base" class="scenario-base"></span>
               <span id="scenario-months-error" class="field-error" hidden>Введите число от 0.</span>
             </div>
           </div>
@@ -312,7 +319,7 @@
                 <input type="text" inputmode="decimal" data-money id="scenario-purchasePrice" name="purchasePrice" aria-describedby="scenario-purchasePrice-unit scenario-purchasePrice-base" aria-errormessage="scenario-purchasePrice-error">
                 <span id="scenario-purchasePrice-unit" class="unit">₽</span>
               </div>
-              <span id="scenario-purchasePrice-base" class="visually-hidden"></span>
+              <span id="scenario-purchasePrice-base" class="scenario-base"></span>
               <span id="scenario-purchasePrice-error" class="field-error" hidden>Введите число от 0.</span>
             </div>
             <div class="field">
@@ -321,7 +328,7 @@
                 <input type="text" inputmode="decimal" data-money id="scenario-purchaseExpenses" name="purchaseExpenses" aria-describedby="scenario-purchaseExpenses-unit scenario-purchaseExpenses-base" aria-errormessage="scenario-purchaseExpenses-error">
                 <span id="scenario-purchaseExpenses-unit" class="unit">₽</span>
               </div>
-              <span id="scenario-purchaseExpenses-base" class="visually-hidden"></span>
+              <span id="scenario-purchaseExpenses-base" class="scenario-base"></span>
               <span id="scenario-purchaseExpenses-error" class="field-error" hidden>Введите число от 0.</span>
             </div>
             <div class="field">
@@ -330,7 +337,7 @@
                 <input type="text" inputmode="decimal" id="scenario-commissionRate" name="commissionRate" aria-describedby="scenario-commissionRate-unit scenario-commissionRate-base" aria-errormessage="scenario-commissionRate-error">
                 <span id="scenario-commissionRate-unit" class="unit">%</span>
               </div>
-              <span id="scenario-commissionRate-base" class="visually-hidden"></span>
+              <span id="scenario-commissionRate-base" class="scenario-base"></span>
               <span id="scenario-commissionRate-error" class="field-error" hidden>Введите ставку от 0% до значения меньше 100%.</span>
             </div>
             <div class="field">
@@ -339,7 +346,7 @@
                 <input type="text" inputmode="decimal" data-money id="scenario-saleExpenses" name="saleExpenses" aria-describedby="scenario-saleExpenses-unit scenario-saleExpenses-base" aria-errormessage="scenario-saleExpenses-error">
                 <span id="scenario-saleExpenses-unit" class="unit">₽</span>
               </div>
-              <span id="scenario-saleExpenses-base" class="visually-hidden"></span>
+              <span id="scenario-saleExpenses-base" class="scenario-base"></span>
               <span id="scenario-saleExpenses-error" class="field-error" hidden>Введите число от 0.</span>
             </div>
             <div class="field">
@@ -348,7 +355,7 @@
                 <input type="text" inputmode="decimal" data-money id="scenario-monthlyHolding" name="monthlyHolding" aria-describedby="scenario-monthlyHolding-unit scenario-monthlyHolding-base" aria-errormessage="scenario-monthlyHolding-error">
                 <span id="scenario-monthlyHolding-unit" class="unit">₽</span>
               </div>
-              <span id="scenario-monthlyHolding-base" class="visually-hidden"></span>
+              <span id="scenario-monthlyHolding-base" class="scenario-base"></span>
               <span id="scenario-monthlyHolding-error" class="field-error" hidden>Введите число от 0.</span>
             </div>
             <div class="field">
@@ -357,7 +364,7 @@
                 <input type="text" inputmode="decimal" data-money id="scenario-loanInterest" name="loanInterest" aria-describedby="scenario-loanInterest-unit scenario-loanInterest-base" aria-errormessage="scenario-loanInterest-error">
                 <span id="scenario-loanInterest-unit" class="unit">₽</span>
               </div>
-              <span id="scenario-loanInterest-base" class="visually-hidden"></span>
+              <span id="scenario-loanInterest-base" class="scenario-base"></span>
               <span id="scenario-loanInterest-error" class="field-error" hidden>Введите число от 0.</span>
             </div>
             <div class="field">
@@ -366,7 +373,7 @@
                 <input type="text" inputmode="decimal" data-money id="scenario-tax" name="tax" aria-describedby="scenario-tax-unit scenario-tax-base" aria-errormessage="scenario-tax-error">
                 <span id="scenario-tax-unit" class="unit">₽</span>
               </div>
-              <span id="scenario-tax-base" class="visually-hidden"></span>
+              <span id="scenario-tax-base" class="scenario-base"></span>
               <span id="scenario-tax-error" class="field-error" hidden>Введите число от 0.</span>
             </div>
             <div class="field">
@@ -375,7 +382,7 @@
                 <input type="text" inputmode="decimal" data-money id="scenario-otherExpenses" name="otherExpenses" aria-describedby="scenario-otherExpenses-unit scenario-otherExpenses-base" aria-errormessage="scenario-otherExpenses-error">
                 <span id="scenario-otherExpenses-unit" class="unit">₽</span>
               </div>
-              <span id="scenario-otherExpenses-base" class="visually-hidden"></span>
+              <span id="scenario-otherExpenses-base" class="scenario-base"></span>
               <span id="scenario-otherExpenses-error" class="field-error" hidden>Введите число от 0.</span>
             </div>
           </div>
@@ -387,6 +394,8 @@
           <h2 id="results-title">Результаты</h2>
           <button type="button" class="example-button" id="share-deal" aria-haspopup="dialog">Поделиться</button>
         </div>
+        <p class="result-state" id="result-state" role="status"></p>
+        <p class="result-error" id="result-error" hidden><button class="text-button" type="button" id="fix-calculation"></button></p>
         <dl class="metrics">
           <div class="profit">
             <dt>Прибыль</dt>
@@ -409,7 +418,7 @@
             <dd data-result="returnOnCost">—</dd>
           </div>
           <div class="metric">
-            <dt>Цена безубыточности</dt>
+            <dt>Цена безубыточности <small>Комиссия пересчитывается от этой цены продажи.</small></dt>
             <dd data-result="breakEvenPrice">—</dd>
           </div>
           <div class="metric">
@@ -422,8 +431,13 @@
           </div>
         </dl>
         <div class="preliminary" id="preliminary" hidden>
-          <p>Предварительный расчёт</p>
           <p id="uncounted-costs"></p>
+        </div>
+        <div class="editor-actions result-actions">
+          <button type="button" class="primary-button" id="save-result" disabled>Сохранить объект</button>
+          <button type="button" class="example-button" id="new-after-save" hidden>Новый расчёт</button>
+          <button type="button" class="example-button" data-edit-inputs>К редактированию</button>
+          <p id="result-save-status" class="draft-status" role="status"></p>
         </div>
         <details class="breakdown">
           <summary>Разбивка себестоимости</summary>
@@ -451,14 +465,23 @@
   <main id="objects-view" class="shell" hidden>
     <div class="intro">
       <h1 id="objects-title" tabindex="-1">Мои объекты</h1>
-      <p>Карточки хранятся в этом браузере. Скачайте копию, чтобы перенести их на другое устройство.</p>
+      <p>Карточки хранятся в этом браузере.</p>
     </div>
     <div class="library-actions">
-      <button type="button" class="primary-button" id="open-draft">К черновику</button>
-      <button type="button" class="example-button" id="compare-objects" aria-controls="comparison-view" title="Выберите минимум два объекта" disabled>Сравнить</button>
-      <button type="button" class="example-button" id="export-objects">Скачать копию</button>
-      <button type="button" class="example-button" id="import-objects">Импортировать</button>
-      <input type="file" id="objects-file" accept=".json,application/json" hidden>
+      <button type="button" class="primary-button" id="new-from-library">Новый расчёт</button>
+      <button type="button" class="example-button" id="open-draft" hidden>Продолжить черновик</button>
+    </div>
+    <details class="backup-actions">
+      <summary>Резервная копия</summary>
+      <div class="library-actions">
+        <button type="button" class="example-button" id="export-objects">Скачать JSON</button>
+        <button type="button" class="example-button" id="import-objects">Восстановить из копии</button>
+        <input type="file" id="objects-file" accept=".json,application/json" hidden>
+      </div>
+    </details>
+    <div class="library-actions compare-actions" id="compare-actions" hidden>
+      <button type="button" class="example-button" id="compare-objects" aria-controls="comparison-view" aria-describedby="selection-status" disabled>Сравнить</button>
+      <p id="selection-status" class="draft-status" role="status">Выберите минимум два объекта для сравнения.</p>
     </div>
     <p id="library-status" class="draft-status" role="status"></p>
     <p id="empty-objects" class="card library-empty" hidden>Сохраните первый расчёт, чтобы он появился здесь.</p>
@@ -468,6 +491,7 @@
   <main id="comparison-view" class="shell" hidden>
     <div class="intro">
       <h1 id="comparison-title" tabindex="-1">Сравнение объектов</h1>
+      <p id="comparison-count" hidden></p>
     </div>
     <div class="library-actions">
       <button type="button" class="example-button" id="back-to-objects">К списку объектов</button>
@@ -486,10 +510,11 @@
     <h2 id="share-title">Поделиться расчётом</h2>
     <fieldset id="share-options" class="share-options" hidden>
       <legend>Добавить в PDF</legend>
-      <label class="share-option" hidden><input type="checkbox" name="location"> Адрес или район</label>
-      <label class="share-option" hidden><input type="checkbox" name="listingUrl"> Ссылку на объявление</label>
-      <label class="share-option" hidden><input type="checkbox" name="layoutNote"> Заметки</label>
+      <label class="share-option" hidden><input type="checkbox" name="location"><span>Адрес или район</span></label>
+      <label class="share-option" hidden><input type="checkbox" name="listingUrl"><span>Ссылка на объявление</span></label>
+      <label class="share-option" hidden><input type="checkbox" name="layoutNote"><span>Заметки</span></label>
     </fieldset>
+    <p id="share-included" class="share-included" aria-live="polite"></p>
     <p id="share-status" class="draft-status" role="status"></p>
     <div class="share-actions">
       <button type="button" id="share-confirm" class="primary-button" disabled>Подготовить PDF</button>
@@ -503,13 +528,15 @@
         <h2 data-object-name></h2>
         <p data-object-location hidden></p>
         <p class="object-preliminary" data-object-preliminary hidden>Предварительный расчёт</p>
+        <p class="object-dirty" data-object-dirty hidden>Открыт с несохранёнными изменениями</p>
       </div>
       <div class="object-profit">
         <span>Базовая прибыль</span>
         <strong data-object-profit></strong>
+        <small data-object-profit-note hidden></small>
       </div>
       <div class="object-actions">
-        <label class="object-selection"><input type="checkbox" data-object-select> Выбрать</label>
+        <label class="object-selection"><input type="checkbox" data-object-select> Для сравнения</label>
         <button type="button" class="example-button" data-object-open>Открыть</button>
         <button type="button" class="remove-work" data-object-delete>Удалить</button>
       </div>

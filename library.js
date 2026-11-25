@@ -9,8 +9,11 @@ const calculatorTitle = document.querySelector('#calculator-title');
 const objectsTitle = document.querySelector('#objects-title');
 const comparisonTitle = document.querySelector('#comparison-title');
 const saveButton = document.querySelector('#save-object');
+const saveButtons = [saveButton, document.querySelector('#save-result')];
 const leaveButton = document.querySelector('#leave-object');
 const guestButton = document.querySelector('#open-draft');
+const newFromLibrary = document.querySelector('#new-from-library');
+const newAfterSave = document.querySelector('#new-after-save');
 const exampleButton = document.querySelector('#load-example');
 const exportButton = document.querySelector('#export-objects');
 const importButton = document.querySelector('#import-objects');
@@ -20,6 +23,8 @@ const objectTemplate = document.querySelector('#object-template');
 const emptyObjects = document.querySelector('#empty-objects');
 const libraryStatus = document.querySelector('#library-status');
 const compareButton = document.querySelector('#compare-objects');
+const compareActions = document.querySelector('#compare-actions');
+const selectionStatus = document.querySelector('#selection-status');
 const selectedObjectIds = new Set();
 
 let activeObject = null;
@@ -51,10 +56,32 @@ function showView(view) {
 
 function updateEditorActions() {
   calculatorTitle.textContent = activeObject ? objectName(activeObject) : 'Калькулятор флип-сделки';
-  saveButton.textContent = activeObject ? 'Сохранить изменения' : 'Сохранить объект';
-  leaveButton.hidden = activeObject === null;
+  for (const button of saveButtons) button.textContent = activeObject ? 'Сохранить изменения' : 'Сохранить объект';
+  newAfterSave.hidden = activeObject === null;
   exampleButton.hidden = activeObject !== null;
+  refreshDraftActions();
   updateObjectUnloadGuard();
+}
+
+function hasPendingGuestEdits() {
+  return guestInMemory !== null && !sameDraftValues(guestInMemory.draft, guestInMemory.baseline);
+}
+
+function refreshDraftActions() {
+  const draft = currentDraft();
+  for (const button of saveButtons) button.disabled = libraryBusy || !hasDraftValues(draft);
+  let guest = activeObject === null ? draft : guestInMemory?.draft;
+  const pendingInEditor = activeObject === null && !sameDraftValues(draft, previousDraft);
+  const readStored = activeObject === null ? !pendingInEditor && !hasDraftValues(draft) : !hasPendingGuestEdits();
+  if (readStored) {
+    try {
+      guest = loadDraft(window.localStorage);
+    } catch {
+      // A guest snapshot can still be available in this tab.
+    }
+  }
+  guestButton.hidden = !hasDraftValues(guest);
+  leaveButton.hidden = activeObject === null || guestButton.hidden;
 }
 
 function editorHasChanges() {
@@ -105,8 +132,8 @@ function openSavedObject(id, showError = showLibraryStatus) {
 }
 
 function restoreGuestEditor() {
-  let guest = guestInMemory?.draft ?? null;
-  const pending = guestInMemory !== null && !sameDraftValues(guestInMemory.draft, guestInMemory.baseline);
+  let guest = activeObject === null ? currentDraft() : guestInMemory?.draft ?? null;
+  const pending = hasPendingGuestEdits();
   let storageError = false;
   try {
     if (!pending) guest = loadDraft(window.localStorage);
@@ -125,14 +152,42 @@ function restoreGuestEditor() {
 
 function openGuestEditor() {
   if (libraryBusy || !confirmLeavingEditor()) return;
-  if (activeObject !== null) restoreGuestEditor();
+  const draft = currentDraft();
+  if (activeObject !== null || (!hasDraftValues(draft) && sameDraftValues(draft, previousDraft))) restoreGuestEditor();
   showView('calculator');
+}
+
+function newCalculation() {
+  if (libraryBusy || !confirmLeavingEditor()) return;
+  try {
+    const storage = window.localStorage;
+    const stored = loadDraft(storage);
+    const guest = activeObject === null ? currentDraft() : hasPendingGuestEdits() ? guestInMemory.draft : stored;
+    if ((hasDraftValues(guest) || hasDraftValues(stored))
+      && !window.confirm('Начать новый расчёт и очистить текущий черновик?')) return;
+    if (stored && !clearSavedDraft(storage, stored)) {
+      throw new Error('The draft changed in another tab');
+    }
+  } catch {
+    const message = 'Не удалось очистить черновик. Откройте его и проверьте данные.';
+    if (!objectsView.hidden) showLibraryStatus(message, true);
+    else showResultSaveStatus(message, true);
+    return;
+  }
+  activeObject = null;
+  editorBaseline = null;
+  guestInMemory = null;
+  openEditor(null);
+  showDraftStatus('');
+  updateEditorActions();
+  showView('calculator');
+  focusEditorControl(document.querySelector('#form-title'));
 }
 
 async function changeLibrary(action, onError) {
   if (libraryBusy) return;
   libraryBusy = true;
-  saveButton.disabled = true;
+  refreshDraftActions();
   try {
     const locks = window.navigator?.locks;
     if (locks) await locks.request(OBJECTS_KEY, action);
@@ -141,7 +196,7 @@ async function changeLibrary(action, onError) {
     onError(error);
   } finally {
     libraryBusy = false;
-    saveButton.disabled = false;
+    refreshDraftActions();
   }
 }
 
@@ -149,6 +204,7 @@ function saveEditorObject() {
   return changeLibrary(() => {
     const storage = window.localStorage;
     const snapshot = currentDraft();
+    if (!hasDraftValues(snapshot)) return;
     const creating = activeObject === null;
     activeObject = saveObject(storage, snapshot, activeObject);
     editorBaseline = snapshot;
@@ -166,6 +222,7 @@ function saveEditorObject() {
     }
     const message = draftCleared ? 'Объект сохранён в этом браузере.' : 'Объект сохранён. Гостевой черновик остался в браузере.';
     showDraftStatus(message);
+    showResultSaveStatus(message);
     if (!objectsView.hidden) {
       refreshLibrary();
       showLibraryStatus(message);
@@ -176,6 +233,7 @@ function saveEditorObject() {
       ? 'Объект изменён или удалён в другой вкладке. Откройте актуальную карточку из списка.'
       : 'Не удалось сохранить объект. Введённые данные остались в форме.';
     showDraftStatus(message, true);
+    showResultSaveStatus(message, true);
     if (!objectsView.hidden) showLibraryStatus(message, true);
     if (!comparisonView.hidden) showComparisonStatus(message, true);
   });
@@ -191,7 +249,7 @@ function removeSavedObject(record) {
     refreshLibrary();
     showLibraryStatus('Объект удалён.');
     if (!comparisonView.hidden) refreshComparison();
-    if (!objectsView.hidden) (objectList.querySelector('[data-object-open]') ?? guestButton).focus();
+    if (!objectsView.hidden) (objectList.querySelector('[data-object-open]') ?? newFromLibrary).focus();
   }, (error) => {
     refreshLibrary();
     showLibraryStatus(error instanceof ObjectConflict
@@ -204,14 +262,20 @@ function objectCard(record) {
   const item = objectTemplate.content.firstElementChild.cloneNode(true);
   const name = objectName(record);
   const location = record.draft.base.location?.trim();
-  const base = calculateStoredBase(record.draft);
+  const { base } = calculateDraftComparison(record.draft);
 
   item.querySelector('[data-object-name]').textContent = name;
   const locationLabel = item.querySelector('[data-object-location]');
   locationLabel.textContent = location ?? '';
   locationLabel.hidden = !location;
-  item.querySelector('[data-object-preliminary]').hidden = base.uncountedCosts.length === 0;
+  const preliminary = item.querySelector('[data-object-preliminary]');
+  preliminary.hidden = !['invalid', 'preliminary'].includes(base.state);
+  if (base.state === 'invalid') preliminary.textContent = 'Ошибка в исходных данных';
+  item.querySelector('[data-object-dirty]').hidden = activeObject?.id !== record.id || !editorHasChanges();
   item.querySelector('[data-object-profit]').textContent = base.profit === null ? '—' : formatMoney(base.profit);
+  const profitNote = item.querySelector('[data-object-profit-note]');
+  profitNote.textContent = metricNote(base, 'profit');
+  profitNote.hidden = !profitNote.textContent;
 
   const select = item.querySelector('[data-object-select]');
   select.checked = selectedObjectIds.has(record.id);
@@ -234,7 +298,8 @@ function objectCard(record) {
 function updateCompareButton() {
   const count = selectedObjectIds.size;
   compareButton.disabled = count < 2;
-  compareButton.textContent = count === 0 ? 'Сравнить' : `Сравнить (${count})`;
+  compareButton.textContent = `Сравнить (${count})`;
+  selectionStatus.textContent = count < 2 ? `Выбрано: ${count}. Выберите минимум два объекта для сравнения.` : `Выбрано: ${count}.`;
 }
 
 function selectedRecords(objects) {
@@ -255,6 +320,7 @@ function refreshLibrary() {
     emptyObjects.hidden = true;
     exportButton.disabled = true;
     compareButton.disabled = true;
+    compareActions.hidden = true;
     showLibraryStatus('Не удалось открыть сохранённые объекты.', true);
     return;
   }
@@ -263,6 +329,8 @@ function refreshLibrary() {
   objectList.replaceChildren(...objects.map(objectCard));
   emptyObjects.hidden = objects.length !== 0;
   exportButton.disabled = objects.length === 0;
+  compareActions.hidden = objects.length === 0;
+  refreshDraftActions();
 }
 
 function openObjectList() {
@@ -316,9 +384,11 @@ function importSelectedFile() {
   });
 }
 
-saveButton.addEventListener('click', saveEditorObject);
+for (const button of saveButtons) button.addEventListener('click', saveEditorObject);
 leaveButton.addEventListener('click', openGuestEditor);
 guestButton.addEventListener('click', openGuestEditor);
+newFromLibrary.addEventListener('click', newCalculation);
+newAfterSave.addEventListener('click', newCalculation);
 calculatorTab.addEventListener('click', () => showView('calculator'));
 objectsTab.addEventListener('click', openObjectList);
 exportButton.addEventListener('click', downloadObjects);
@@ -326,4 +396,7 @@ importButton.addEventListener('click', () => importInput.click());
 importInput.addEventListener('change', importSelectedFile);
 window.addEventListener('storage', ({ key }) => {
   if (!objectsView.hidden && (key === OBJECTS_KEY || key === null)) refreshLibrary();
+  if (key === DRAFT_KEY || key === null) refreshDraftActions();
 });
+document.addEventListener('fliplab:editor-rendered', refreshDraftActions);
+updateEditorActions();
